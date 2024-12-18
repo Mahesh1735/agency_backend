@@ -9,5 +9,4 @@ pydantic
 langgraph-checkpoint-postgres
 langchain-community
 psycopg-pool==3.2.3
-pygraphviz
 gunicorn==21.2.0
