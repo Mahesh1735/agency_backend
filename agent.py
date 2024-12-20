@@ -46,8 +46,8 @@ def instagram_marketing(instagram_page_url: str, company_website_url: str, conte
     timestamp = get_timestamp()
     return f"Task created and is under processing state with task id: {timestamp}, results will be delivered in a while, please wait!", timestamp
 
-@tool('facebook_ads')
-def facebook_ads(facebook_page_url: str, company_website_url: str, content_preference: str, target_audience_profile: str):
+@tool('facebook_content_creator')
+def facebook_content_creator(facebook_page_url: str, company_website_url: str, content_preference: str, target_audience_profile: str):
     """
     Generate a Facebook ad
 
@@ -108,7 +108,7 @@ def miscellaneous_task(task_type: str, task_inputs: dict, expected_output: str):
     
 tools = {
         "linkedin_growth": linkedin_growth,
-        "facebook_ads": facebook_ads,
+        "facebook_content_creator": facebook_content_creator,
         "instagram_marketing": instagram_marketing,
         "SEO_content_generator": SEO_content_generator,
         "miscellaneous_task": miscellaneous_task
