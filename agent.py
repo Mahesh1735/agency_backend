@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from typing_extensions import Annotated, TypedDict
 from langgraph.graph import StateGraph, END
 import operator
-from langchain_core.messages import AnyMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AnyMessage, SystemMessage, ToolMessage, AIMessage
 from langchain_core.tools import tool
 from datetime import datetime
 load_dotenv()
@@ -32,7 +32,7 @@ class AgentState(TypedDict):
     tool: str | None = None
 
 @tool('instagram_marketing')
-def instagram_marketing(instagram_page_url: str, company_website_url: str, content_preference: str, target_audience_profile: str):
+def instagram_marketing(instagram_page_url: str, company_website_url: str, content_preference: str, target_audience_profile: str, additional_inputs: dict | None = None):
     """
     Generate a short form videos for Instagram as a reel
 
@@ -47,7 +47,7 @@ def instagram_marketing(instagram_page_url: str, company_website_url: str, conte
     return f"Task created and is under processing state with task id: {timestamp}, results will be delivered in a while, please wait!", timestamp
 
 @tool('facebook_content_creator')
-def facebook_content_creator(facebook_page_url: str, company_website_url: str, content_preference: str, target_audience_profile: str):
+def facebook_content_creator(facebook_page_url: str, company_website_url: str, content_preference: str, target_audience_profile: str, additional_inputs: dict | None = None):
     """
     Generate a Facebook ad
 
@@ -62,7 +62,7 @@ def facebook_content_creator(facebook_page_url: str, company_website_url: str, c
     return f"Task created and is under processing state with task id: {timestamp}, results will be delivered in a while, please wait!", timestamp
 
 @tool('linkedin_growth')
-def linkedin_growth(linkedin_page_url: str, company_website_url: str, content_preference: str, target_audience_profile: str):
+def linkedin_growth(linkedin_page_url: str, company_website_url: str, content_preference: str, target_audience_profile: str, additional_inputs: dict | None = None):
     """
     Generate a LinkedIn post
 
@@ -77,7 +77,7 @@ def linkedin_growth(linkedin_page_url: str, company_website_url: str, content_pr
     return f"Task created and is under processing state with task id: {timestamp}, results will be delivered in a while, please wait!", timestamp
 
 @tool('SEO_content_generator')
-def SEO_content_generator(company_website_url: str, content_preference: str, target_audience_profile: str):
+def SEO_content_generator(company_website_url: str, content_preference: str, target_audience_profile: str, additional_inputs: dict | None = None):
     """
     Generate SEO content for the company website
 
@@ -118,16 +118,32 @@ class Agent:
     def __init__(self, model, tools=tools, checkpointer=None):
 
         self.orchestrator_system_prompt = f"""
-        You are a freelancer expert in the AI tools and services.
+        You are a great consultant expert in the AI tools and services.
+        You will be working along with an agent in the backend as an assistant to serve the users with their needs.
+        In the following conversations you and the agent will be responding to the user as assistant.
+
+        Your job is to talk to the user on the agent's behalf.
         you have to talk to the user and understand what they are looking for and then determine the best tool suitable for the task. from the list below:
         {", ".join(tools.keys())}
-        then call the tool after collecting all the information from the user required as inputs for calling the tool.
+        then call the tool after collecting all the information from the user required as inputs for calling the tool. calling the tool will create a task with the inputs provided and puts it in the processing state.
+        After collecting the required inputs always ask for confirmation from the user before creating any task by calling a tool, while confirming ask for any additional inputs that you feel are helpful or ask the user if they have any more additional inputs.
         if the user is asking for a task that is not covered by the tools, then use the miscellaneous_task tool to perform the task.
+        Use the context provided at the below for the current state of tasks for questions related to the tasks.
+        whenever you are not sure about what to respond to the user's message, just say "I will getback to you on that soon", Then the agent will respond as an assistant and continues that conversation.
+
+        Agent's only job is to complete the tasks in processing state by adding the results to the task, and then updating the task status to completed in couple of hours.
+        Agent will also respond to the user like a assistant for the questions you are unable to answer.
 
         if user starts the convesation by mentioning a specific tool, then try to use that tool to perform the task.
 
-        Always respond as consicely as possible, bravity and to the point is very important.
-        Instead of responding with a long sentences, always respond in markdown format with a lot of visual structure (Heading, keypoints, lists, etc). so that it is easy to read and understand.
+        #########################################################
+        Instructions for you while responding to the user:
+
+        You dont have to mention that you are working along with an agent, just respond as if you are doing it all and you are the assistant completely.
+        You dont need to share your thought process with the user, just address the user's asks and share only and structurally highlight the final outcome or response or about the actions user needs to take next.
+        Always respond as consicely as possible, bravity and to the point is very important. Be interactive with very short and crisp sentences. Come to the point directly in the first sentence and it should be the direct answer to the user's question or about the next steps.
+        Importantly always respond like structured bullet points or keypoints. Instead of responding with a long paragraphs or sentences, always respond in markdown format with a lot of visual structure (Heading, subheadings,keypoints, lists, one liners, etc). so that it is easy to read and understand. and use a lot of emojis to make it more engaging and visual. Use relevant emojis for headings and subheadings.
+        Be polite, very cute and friendly and professional, energitic and enthusiastic.
         """
 
         graph = StateGraph(AgentState)
@@ -148,7 +164,16 @@ class Agent:
     def orchestrator(self, state: AgentState):
 
         messages = state['messages']
-        messages = [SystemMessage(content=self.orchestrator_system_prompt)] + messages
+        task_context = str(state.get('tasks', {}))
+        task_context = f"""
+        #########################################################
+        The Context for current state of tasks: 
+        
+        {task_context}
+
+        #########################################################
+        """
+        messages = [SystemMessage(content=self.orchestrator_system_prompt)] + [SystemMessage(content=task_context)] + messages
 
         response = self.model.invoke(messages)
         return {'messages': [response]}
